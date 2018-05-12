@@ -5,9 +5,10 @@
     ```
 1. Run docker container to serve the example yaml
     ```
+    (SWAGGER_JSON=/tmp/openapi.yaml; \
     docker run -d -p 8080:8080 \
-    --mount type=bind,source=$(pwd)/openapi.yaml,target=/tmp/openapi.yaml \
-    -e SWAGGER_JSON=/tmp/openapi.yaml swaggerapi/swagger-ui
+    --mount type=bind,source=$(pwd)/openapi.yaml,target=${SWAGGER_JSON} \
+    -e SWAGGER_JSON=${SWAGGER_JSON} swaggerapi/swagger-ui)
     ```
 1. Visit sample page  
     http://127.0.0.1:8080/
