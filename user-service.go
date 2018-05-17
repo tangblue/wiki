@@ -27,36 +27,42 @@ func (u UserResource) WebService() *restful.WebService {
 		Produces(restful.MIME_JSON, restful.MIME_XML)
 
 	tags := []string{"users"}
-	uid := ws.PathParameter("user-id", "identifier of the user").DataType("string").DefaultValue("1")
+	tagUsers := func(b *restful.RouteBuilder) {
+		b.Metadata(restfulspec.KeyOpenAPITags, tags)
+	}
 
+	uid := ws.PathParameter("id", "identifier of the user").DataType("string").DefaultValue("1")
 	ws.Route(ws.GET("/").To(u.findAllUsers).
 		Doc("get all users").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Do(tagUsers).
 		Writes([]User{}).
 		Returns(200, "OK", []User{}))
 
-	ws.Route(ws.GET("/{user-id}").To(u.findUser).
+	ws.Route(ws.GET("/{id}").To(u.findUser).
 		Doc("get a user").
+		Do(tagUsers).
 		Param(uid).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Writes(User{}).
 		Returns(200, "OK", User{}).
 		Returns(404, "Not Found", nil))
 
-	ws.Route(ws.PUT("/{user-id}").To(u.updateUser).
+	ws.Route(ws.PUT("/{id}").To(u.updateUser).
 		Doc("update a user").
+		Do(tagUsers).
 		Param(uid).
-		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Reads(User{}))
+		Reads(User{}).
+		Writes(User{}).
+		Returns(200, "OK", User{}).
+		Returns(404, "Not Found", nil))
 
 	ws.Route(ws.PUT("").To(u.createUser).
 		Doc("create a user").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Do(tagUsers).
 		Reads(User{}))
 
-	ws.Route(ws.DELETE("/{user-id}").To(u.removeUser).
+	ws.Route(ws.DELETE("/{id}").To(u.removeUser).
 		Doc("delete a user").
-		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Do(tagUsers).
 		Param(uid))
 
 	return ws
@@ -71,9 +77,8 @@ func (u UserResource) findAllUsers(request *restful.Request, response *restful.R
 }
 
 func (u UserResource) findUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("user-id")
-	usr := u.users[id]
-	if len(usr.ID) == 0 {
+	id := request.PathParameter("id")
+	if usr, ok := u.users[id]; !ok {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
 	} else {
 		response.WriteEntity(usr)
@@ -81,10 +86,16 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 }
 
 func (u *UserResource) updateUser(request *restful.Request, response *restful.Response) {
-	usr := new(User)
-	err := request.ReadEntity(&usr)
-	if err == nil {
-		u.users[usr.ID] = *usr
+	id := request.PathParameter("id")
+	usr, ok := u.users[id]
+	if !ok {
+		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+		return
+	}
+
+	if err := request.ReadEntity(&usr); err == nil {
+		usr.ID = id
+		u.users[id] = usr
 		response.WriteEntity(usr)
 	} else {
 		response.WriteError(http.StatusInternalServerError, err)
@@ -92,9 +103,8 @@ func (u *UserResource) updateUser(request *restful.Request, response *restful.Re
 }
 
 func (u *UserResource) createUser(request *restful.Request, response *restful.Response) {
-	usr := User{ID: request.PathParameter("user-id")}
-	err := request.ReadEntity(&usr)
-	if err == nil {
+	usr := User{}
+	if err := request.ReadEntity(&usr); err == nil {
 		u.users[usr.ID] = usr
 		response.WriteHeaderAndEntity(http.StatusCreated, usr)
 	} else {
@@ -103,7 +113,7 @@ func (u *UserResource) createUser(request *restful.Request, response *restful.Re
 }
 
 func (u *UserResource) removeUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("user-id")
+	id := request.PathParameter("id")
 	delete(u.users, id)
 }
 
