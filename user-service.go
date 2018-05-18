@@ -21,24 +21,30 @@ type UserResource struct {
 }
 
 func (u UserResource) WebService() *restful.WebService {
+	printPath := func(request *restful.Request, response *restful.Response, chain *restful.FilterChain) {
+		log.Printf("Path: %v", request.Request.URL.Path)
+		chain.ProcessFilter(request, response)
+	}
+
 	ws := new(restful.WebService)
 	ws.Path("/users").
 		Consumes(restful.MIME_JSON, restful.MIME_XML).
-		Produces(restful.MIME_JSON, restful.MIME_XML)
+		Produces(restful.MIME_JSON, restful.MIME_XML).
+		Filter(printPath)
 
 	tags := []string{"users"}
 	tagUsers := func(b *restful.RouteBuilder) {
 		b.Metadata(restfulspec.KeyOpenAPITags, tags)
 	}
 
-	uid := ws.PathParameter("id", "identifier of the user").DataType("string").DefaultValue("1")
+	uid := ws.PathParameter("userID", "identifier of the user").DataType("string").DefaultValue("1")
 	ws.Route(ws.GET("/").To(u.findAllUsers).
 		Doc("get all users").
 		Do(tagUsers).
 		Writes([]User{}).
 		Returns(200, "OK", []User{}))
 
-	ws.Route(ws.GET("/{id}").To(u.findUser).
+	ws.Route(ws.GET("/{userID}").To(u.findUser).
 		Doc("get a user").
 		Do(tagUsers).
 		Param(uid).
@@ -46,7 +52,7 @@ func (u UserResource) WebService() *restful.WebService {
 		Returns(200, "OK", User{}).
 		Returns(404, "Not Found", nil))
 
-	ws.Route(ws.PUT("/{id}").To(u.updateUser).
+	ws.Route(ws.PUT("/{userID}").To(u.updateUser).
 		Doc("update a user").
 		Do(tagUsers).
 		Param(uid).
@@ -60,7 +66,7 @@ func (u UserResource) WebService() *restful.WebService {
 		Do(tagUsers).
 		Reads(User{}))
 
-	ws.Route(ws.DELETE("/{id}").To(u.removeUser).
+	ws.Route(ws.DELETE("/{userID}").To(u.removeUser).
 		Doc("delete a user").
 		Do(tagUsers).
 		Param(uid))
@@ -77,7 +83,7 @@ func (u UserResource) findAllUsers(request *restful.Request, response *restful.R
 }
 
 func (u UserResource) findUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("id")
+	id := request.PathParameter("userID")
 	if usr, ok := u.users[id]; !ok {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
 	} else {
@@ -86,7 +92,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 }
 
 func (u *UserResource) updateUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("id")
+	id := request.PathParameter("userID")
 	usr, ok := u.users[id]
 	if !ok {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
@@ -113,7 +119,7 @@ func (u *UserResource) createUser(request *restful.Request, response *restful.Re
 }
 
 func (u *UserResource) removeUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("id")
+	id := request.PathParameter("userID")
 	delete(u.users, id)
 }
 
