@@ -1,13 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/dgrijalva/jwt-go"
 	restful "github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
 	"github.com/go-openapi/spec"
 )
+
+type JWTToken struct {
+	Token string `json:"token"`
+}
 
 type User struct {
 	ID   string `json:"id" description:"identifier of the user" default:"1"`
@@ -18,6 +25,42 @@ type User struct {
 type UserResource struct {
 	// normally one would use DAO (data access object)
 	users map[string]User
+}
+
+func basicAuthenticate(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+	// usr/pwd = admin/admin
+	u, p, ok := req.Request.BasicAuth()
+	if !ok || u != "admin" || p != "admin" {
+		resp.AddHeader("WWW-Authenticate", "Basic realm=Protected Area")
+		resp.WriteErrorString(401, "401: Not Authorized")
+		return
+	}
+	chain.ProcessFilter(req, resp)
+}
+
+const secret = "secret"
+
+func JWTAuthenticate(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+	ah := req.HeaderParameter("authorization")
+	bearerToken := strings.Fields(ah)
+	if len(bearerToken) != 2 {
+		resp.WriteErrorString(401, "401: Not Authorized")
+		return
+	}
+
+	token, error := jwt.Parse(bearerToken[1], func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("There was an error")
+		}
+		return []byte(secret), nil
+	})
+	if error != nil || !token.Valid {
+		resp.WriteErrorString(401, "401: Not Authorized")
+		return
+	}
+	log.Printf("Claims: %v", token.Claims)
+
+	chain.ProcessFilter(req, resp)
 }
 
 func (u UserResource) WebService() *restful.WebService {
@@ -41,8 +84,15 @@ func (u UserResource) WebService() *restful.WebService {
 	ws.Route(ws.GET("/").To(u.findAllUsers).
 		Doc("get all users").
 		Do(tagUsers).
+		Filter(JWTAuthenticate).
 		Writes([]User{}).
 		Returns(200, "OK", []User{}))
+
+	ws.Route(ws.GET("/authenticate").To(u.createToken).
+		Doc("authenticate").
+		Do(tagUsers).
+		Filter(basicAuthenticate).
+		Returns(200, "OK", JWTToken{}))
 
 	ws.Route(ws.GET("/{userID}").To(u.findUser).
 		Doc("get a user").
@@ -72,6 +122,18 @@ func (u UserResource) WebService() *restful.WebService {
 		Param(uid))
 
 	return ws
+}
+
+func (u UserResource) createToken(request *restful.Request, response *restful.Response) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": "admin",
+	})
+	tokenString, error := token.SignedString([]byte(secret))
+	if error != nil {
+		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+	} else {
+		response.WriteEntity(JWTToken{Token: tokenString})
+	}
 }
 
 func (u UserResource) findAllUsers(request *restful.Request, response *restful.Response) {
@@ -135,7 +197,7 @@ func main() {
 	restful.DefaultContainer.Add(restfulspec.NewOpenAPIService(config))
 
 	basePath := "/apidocs/"
-	http.Handle(basePath, http.StripPrefix(basePath, http.FileServer(http.Dir("../swagger-ui/dist"))))
+	http.Handle(basePath, http.StripPrefix(basePath, http.FileServer(http.Dir("./vendor/github.com/swagger-api/swagger-ui/dist"))))
 
 	// Optionally, you may need to enable CORS for the UI to work.
 	cors := restful.CrossOriginResourceSharing{
