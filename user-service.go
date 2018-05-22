@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -17,14 +18,14 @@ type JWTToken struct {
 }
 
 type User struct {
-	ID   string `json:"id" description:"identifier of the user" default:"1"`
+	ID   int    `json:"id" description:"identifier of the user" default:"1"`
 	Name string `json:"name" description:"name of the user" default:"john"`
 	Age  int    `json:"age" description:"age of the user" default:"21"`
 }
 
 type UserResource struct {
 	// normally one would use DAO (data access object)
-	users map[string]User
+	users map[int]User
 }
 
 func basicAuthenticate(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
@@ -48,13 +49,13 @@ func JWTAuthenticate(req *restful.Request, resp *restful.Response, chain *restfu
 		return
 	}
 
-	token, error := jwt.Parse(bearerToken[1], func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(bearerToken[1], func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("There was an error")
 		}
 		return []byte(secret), nil
 	})
-	if error != nil || !token.Valid {
+	if err != nil || !token.Valid {
 		resp.WriteErrorString(401, "401: Not Authorized")
 		return
 	}
@@ -80,7 +81,7 @@ func (u UserResource) WebService() *restful.WebService {
 		b.Metadata(restfulspec.KeyOpenAPITags, tags)
 	}
 
-	uid := ws.PathParameter("userID", "identifier of the user").DataType("string").DefaultValue("1")
+	uid := ws.PathParameter("userID", "identifier of the user").DataType("integer").DefaultValue("1")
 	ws.Route(ws.GET("/").To(u.findAllUsers).
 		Doc("get all users").
 		Do(tagUsers).
@@ -128,12 +129,11 @@ func (u UserResource) createToken(request *restful.Request, response *restful.Re
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": "admin",
 	})
-	tokenString, error := token.SignedString([]byte(secret))
-	if error != nil {
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
-	} else {
-		response.WriteEntity(JWTToken{Token: tokenString})
 	}
+	response.WriteEntity(JWTToken{Token: tokenString})
 }
 
 func (u UserResource) findAllUsers(request *restful.Request, response *restful.Response) {
@@ -145,7 +145,12 @@ func (u UserResource) findAllUsers(request *restful.Request, response *restful.R
 }
 
 func (u UserResource) findUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("userID")
+	id, err := strconv.Atoi(request.PathParameter("userID"))
+	if err != nil {
+		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+		return
+	}
+
 	if usr, ok := u.users[id]; !ok {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
 	} else {
@@ -154,39 +159,49 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 }
 
 func (u *UserResource) updateUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("userID")
+	id, err := strconv.Atoi(request.PathParameter("userID"))
+	if err != nil {
+		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+		return
+	}
+
 	usr, ok := u.users[id]
 	if !ok {
 		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
 		return
 	}
 
-	if err := request.ReadEntity(&usr); err == nil {
-		usr.ID = id
-		u.users[id] = usr
-		response.WriteEntity(usr)
-	} else {
+	if err := request.ReadEntity(&usr); err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
+		return
 	}
+
+	usr.ID = id
+	u.users[id] = usr
+	response.WriteEntity(usr)
 }
 
 func (u *UserResource) createUser(request *restful.Request, response *restful.Response) {
 	usr := User{}
-	if err := request.ReadEntity(&usr); err == nil {
-		u.users[usr.ID] = usr
-		response.WriteHeaderAndEntity(http.StatusCreated, usr)
-	} else {
+	if err := request.ReadEntity(&usr); err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
+		return
 	}
+	u.users[usr.ID] = usr
+	response.WriteHeaderAndEntity(http.StatusCreated, usr)
 }
 
 func (u *UserResource) removeUser(request *restful.Request, response *restful.Response) {
-	id := request.PathParameter("userID")
+	id, err := strconv.Atoi(request.PathParameter("userID"))
+	if err != nil {
+		response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+		return
+	}
 	delete(u.users, id)
 }
 
 func main() {
-	u := UserResource{map[string]User{}}
+	u := UserResource{map[int]User{}}
 	restful.DefaultContainer.Add(u.WebService())
 
 	swaggerJson := "/apidocs.json"
