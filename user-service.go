@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -72,8 +71,12 @@ func (a *Auth) createToken(req *restful.Request, resp *restful.Response) {
 }
 
 func (a *Auth) JWTAuthenticate(req *restful.Request, resp *restful.Response, next func(*restful.Request, *restful.Response)) {
-	ah := req.GetParameter(a.hpAuthorization)
-	bt := strings.Fields(ah)
+	ah, err := req.GetParameter(a.hpAuthorization)
+	if err != nil {
+		resp.WriteErrorString(http.StatusUnauthorized, "401: Not Authorized")
+		return
+	}
+	bt := strings.Fields(ah.(string))
 	if len(bt) != 2 || !strings.EqualFold(bt[0], "bearer") {
 		resp.WriteErrorString(http.StatusUnauthorized, "401: Not Authorized")
 		return
@@ -117,7 +120,9 @@ func (u UserResource) WebService() *restful.WebService {
 		b.Metadata(restfulspec.KeyOpenAPITags, []string{"users"})
 	}
 	addAuth := func(b *restful.RouteBuilder) {
-		b.Filter(u.auth.JWTAuthenticate).Param(u.auth.hpAuthorization)
+		b.Filter(u.auth.JWTAuthenticate).
+			Param(u.auth.hpAuthorization).
+			Returns(http.StatusUnauthorized, "Not Authorized", "")
 	}
 
 	ws := new(restful.WebService)
@@ -128,38 +133,35 @@ func (u UserResource) WebService() *restful.WebService {
 
 	ws.Route(ws.GET("/").To(u.findAllUsers).
 		Doc("get all users").
-		Do(tagUsers).
 		Filter(u.auth.basicAuthenticate).
+		Returns(http.StatusUnauthorized, "Not Authorized", nil).
 		Returns(http.StatusOK, "OK", []User{}).
-		Returns(http.StatusUnauthorized, "Not Authorized", nil))
+		Do(tagUsers))
 
 	ws.Route(ws.PUT("").To(u.createUser).
 		Doc("create a user").
-		Do(tagUsers, addAuth).
 		Reads(User{}).
 		Returns(http.StatusCreated, "Created", User{}).
-		Returns(http.StatusUnauthorized, "Not Authorized", nil))
+		Do(tagUsers, addAuth))
 
 	ws.Route(ws.GET("/{%s}", u.ppUID).To(u.findUser).
 		Doc("get a user").
-		Do(tagUsers).
+		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Returns(http.StatusNotFound, "Not Found", nil))
+		Do(tagUsers))
 
 	ws.Route(ws.PUT("/{%s}", u.ppUID).To(u.updateUser).
 		Doc("update a user").
-		Do(tagUsers, addAuth).
 		Reads(User{}).
+		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Returns(http.StatusUnauthorized, "Not Authorized", nil).
-		Returns(http.StatusNotFound, "Not Found", nil))
+		Do(tagUsers, addAuth))
 
 	ws.Route(ws.DELETE("/{%s}", u.ppUID).To(u.removeUser).
 		Doc("delete a user").
-		Do(tagUsers, addAuth).
+		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusNoContent, "No Content", nil).
-		Returns(http.StatusUnauthorized, "Not Authorized", nil).
-		Returns(http.StatusNotFound, "Not Found", nil))
+		Do(tagUsers, addAuth))
 
 	return ws
 }
@@ -172,8 +174,17 @@ func (u UserResource) findAllUsers(req *restful.Request, resp *restful.Response)
 	resp.WriteEntity(list)
 }
 
+func (u UserResource) getUID(req *restful.Request) (int, error) {
+	param, err := req.GetParameter(u.ppUID)
+	if err != nil {
+		return 0, err
+	}
+
+	return param.(int), nil
+}
+
 func (u UserResource) findUser(req *restful.Request, resp *restful.Response) {
-	id, err := strconv.Atoi(req.GetParameter(u.ppUID))
+	id, err := u.getUID(req)
 	if err != nil {
 		resp.WriteErrorString(http.StatusBadRequest, "User ID is invalid.")
 		return
@@ -187,7 +198,7 @@ func (u UserResource) findUser(req *restful.Request, resp *restful.Response) {
 }
 
 func (u *UserResource) updateUser(req *restful.Request, resp *restful.Response) {
-	id, err := strconv.Atoi(req.GetParameter(u.ppUID))
+	id, err := u.getUID(req)
 	if err != nil {
 		resp.WriteErrorString(http.StatusBadRequest, "User ID is invalid.")
 		return
@@ -220,7 +231,7 @@ func (u *UserResource) createUser(req *restful.Request, resp *restful.Response) 
 }
 
 func (u *UserResource) removeUser(req *restful.Request, resp *restful.Response) {
-	id, err := strconv.Atoi(req.GetParameter(u.ppUID))
+	id, err := u.getUID(req)
 	if err != nil {
 		resp.WriteErrorString(http.StatusBadRequest, "User ID is invalid.")
 		return
@@ -238,7 +249,7 @@ func main() {
 
 	u := UserResource{
 		users: map[int]User{},
-		ppUID: restful.PathParameter("userID", "identifier of the user").DataType("int").Regex("\\d+").DefaultValue("1"),
+		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(int(1)).Regex("\\d+"),
 		auth:  auth,
 	}
 	restful.DefaultContainer.Add(u.WebService())
