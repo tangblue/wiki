@@ -176,11 +176,7 @@ func (u UserResource) findAllUsers(req *restful.Request, resp *restful.Response)
 
 func (u UserResource) getUID(req *restful.Request) (int, error) {
 	param, err := req.GetParameter(u.ppUID)
-	if err != nil {
-		return 0, err
-	}
-
-	return param.(int), nil
+	return param.(int), err
 }
 
 func (u UserResource) findUser(req *restful.Request, resp *restful.Response) {
@@ -243,13 +239,13 @@ func (u *UserResource) removeUser(req *restful.Request, resp *restful.Response) 
 func main() {
 	auth := &Auth{
 		secret:          "secret",
-		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header"),
+		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header").Required(true).LengthRange(8, 128),
 	}
 	restful.DefaultContainer.Add(auth.WebService())
 
 	u := UserResource{
 		users: map[int]User{},
-		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(int(1)).Regex("\\d+"),
+		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(int(0)).Regex("\\d+").ValueRange(0, 10),
 		auth:  auth,
 	}
 	restful.DefaultContainer.Add(u.WebService())
