@@ -32,8 +32,8 @@ func (a *Auth) WebService() *restful.WebService {
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	ws.Route(ws.POST("").To(a.createToken).
-		Doc("login").
+	ws.Route(ws.POST("").Doc("login").
+		To(a.createToken).
 		Metadata(restfulspec.KeyOpenAPITags, []string{"authentication"}).
 		Reads(LoginInfo{}).
 		Returns(http.StatusOK, "OK", JWTToken{}).
@@ -97,15 +97,16 @@ func (a *Auth) JWTAuthenticate(req *restful.Request, resp *restful.Response, nex
 	next(req, resp)
 }
 
+type UID int
 type User struct {
-	ID   int    `json:"id" description:"identifier of the user" default:"1"`
+	ID   UID    `json:"id" description:"identifier of the user" default:"1"`
 	Name string `json:"name" description:"name of the user" default:"john"`
 	Age  int    `json:"age" description:"age of the user" default:"21"`
 }
 
 type UserResource struct {
 	// normally one would use DAO (data access object)
-	users map[int]User
+	users map[UID]User
 	ppUID *restful.Parameter
 
 	auth *Auth
@@ -131,34 +132,34 @@ func (u UserResource) WebService() *restful.WebService {
 		Produces(restful.MIME_JSON, restful.MIME_XML).
 		Filter(printPath)
 
-	ws.Route(ws.GET("/").To(u.findAllUsers).
-		Doc("get all users").
+	ws.Route(ws.GET("/").Doc("get all users").
+		To(u.findAllUsers).
 		Filter(u.auth.basicAuthenticate).
 		Returns(http.StatusUnauthorized, "Not Authorized", nil).
 		Returns(http.StatusOK, "OK", []User{}).
 		Do(tagUsers))
 
-	ws.Route(ws.PUT("").To(u.createUser).
-		Doc("create a user").
+	ws.Route(ws.PUT("").Doc("create a user").
+		To(u.createUser).
 		Reads(User{}).
 		Returns(http.StatusCreated, "Created", User{}).
 		Do(tagUsers, addAuth))
 
-	ws.Route(ws.GET("/{%s}", u.ppUID).To(u.findUser).
-		Doc("get a user").
+	ws.Route(ws.GET("/{%s}", u.ppUID).Doc("get a user").
+		To(u.findUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
 		Do(tagUsers))
 
-	ws.Route(ws.PUT("/{%s}", u.ppUID).To(u.updateUser).
-		Doc("update a user").
+	ws.Route(ws.PUT("/{%s}", u.ppUID).Doc("update a user").
+		To(u.updateUser).
 		Reads(User{}).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
 		Do(tagUsers, addAuth))
 
-	ws.Route(ws.DELETE("/{%s}", u.ppUID).To(u.removeUser).
-		Doc("delete a user").
+	ws.Route(ws.DELETE("/{%s}", u.ppUID).Doc("delete a user").
+		To(u.removeUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusNoContent, "No Content", nil).
 		Do(tagUsers, addAuth))
@@ -174,9 +175,9 @@ func (u UserResource) findAllUsers(req *restful.Request, resp *restful.Response)
 	resp.WriteEntity(list)
 }
 
-func (u UserResource) getUID(req *restful.Request) (int, error) {
+func (u UserResource) getUID(req *restful.Request) (UID, error) {
 	param, err := req.GetParameter(u.ppUID)
-	return param.(int), err
+	return param.(UID), err
 }
 
 func (u UserResource) findUser(req *restful.Request, resp *restful.Response) {
@@ -244,8 +245,8 @@ func main() {
 	restful.DefaultContainer.Add(auth.WebService())
 
 	u := UserResource{
-		users: map[int]User{},
-		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(int(0)).Regex("\\d+").ValueRange(0, 10),
+		users: map[UID]User{},
+		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(UID(0)).Regex("\\d+").ValueRange(UID(0), UID(10)),
 		auth:  auth,
 	}
 	restful.DefaultContainer.Add(u.WebService())
