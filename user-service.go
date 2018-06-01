@@ -33,7 +33,7 @@ func (a *Auth) WebService() *restful.WebService {
 		Produces(restful.MIME_JSON)
 
 	ws.Route(ws.POST("").Doc("login").
-		To(a.createToken).
+		Do(a.createToken).
 		Reads(LoginInfo{}).
 		Returns(http.StatusOK, "OK", JWTToken{}).
 		Returns(http.StatusInternalServerError, "Internal Server Error", nil).
@@ -120,11 +120,11 @@ func (u UserResource) WebService() *restful.WebService {
 	tagUsers := func(b *restful.RouteBuilder) {
 		b.Metadata(restfulspec.KeyOpenAPITags, []string{"users"})
 	}
-	addBasicAuth := func(b *restful.RouteBuilder) {
+	basicAuth := func(b *restful.RouteBuilder) {
 		b.Filter(u.auth.basicAuthenticate).
 			Returns(http.StatusUnauthorized, "Not Authorized", nil)
 	}
-	addJWTAuth := func(b *restful.RouteBuilder) {
+	JWTAuth := func(b *restful.RouteBuilder) {
 		b.Filter(u.auth.JWTAuthenticate).
 			Param(u.auth.hpAuthorization).
 			Returns(http.StatusUnauthorized, "Not Authorized", "")
@@ -137,34 +137,34 @@ func (u UserResource) WebService() *restful.WebService {
 		Filter(printPath)
 
 	ws.Route(ws.GET("/").Doc("get all users").
-		To(u.findAllUsers).
+		Do(u.findAllUsers).
 		Returns(http.StatusOK, "OK", []User{}).
-		Do(tagUsers, addBasicAuth))
+		Add(tagUsers, basicAuth))
 
 	ws.Route(ws.PUT("").Doc("create a user").
-		To(u.createUser).
+		Do(u.createUser).
 		Reads(User{}).
 		Returns(http.StatusCreated, "Created", User{}).
-		Do(tagUsers, addJWTAuth))
+		Add(tagUsers, JWTAuth))
 
 	ws.Route(ws.GET("/{%s}", u.ppUID).Doc("get a user").
-		To(u.findUser).
+		Do(u.findUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Do(tagUsers))
+		Add(tagUsers))
 
 	ws.Route(ws.PUT("/{%s}", u.ppUID).Doc("update a user").
-		To(u.updateUser).
+		Do(u.updateUser).
 		Reads(User{}).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Do(tagUsers, addJWTAuth))
+		Add(tagUsers, JWTAuth))
 
 	ws.Route(ws.DELETE("/{%s}", u.ppUID).Doc("delete a user").
-		To(u.removeUser).
+		Do(u.removeUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusNoContent, "No Content", nil).
-		Do(tagUsers, addJWTAuth))
+		Add(tagUsers, JWTAuth))
 
 	return ws
 }
