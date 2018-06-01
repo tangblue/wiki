@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/go-openapi/spec"
 	"github.com/tangblue/goapi/restful"
 	"github.com/tangblue/goapi/restfulspec"
+	"github.com/tangblue/goapi/spec"
 )
 
 type LoginInfo struct {
@@ -34,11 +34,11 @@ func (a *Auth) WebService() *restful.WebService {
 
 	ws.Route(ws.POST("").Doc("login").
 		To(a.createToken).
-		Metadata(restfulspec.KeyOpenAPITags, []string{"authentication"}).
 		Reads(LoginInfo{}).
 		Returns(http.StatusOK, "OK", JWTToken{}).
 		Returns(http.StatusInternalServerError, "Internal Server Error", nil).
-		Returns(http.StatusUnprocessableEntity, "Bad user name or password", nil))
+		Returns(http.StatusUnprocessableEntity, "Bad user name or password", nil).
+		Metadata(restfulspec.KeyOpenAPITags, []string{"authentication"}))
 
 	return ws
 }
@@ -120,7 +120,11 @@ func (u UserResource) WebService() *restful.WebService {
 	tagUsers := func(b *restful.RouteBuilder) {
 		b.Metadata(restfulspec.KeyOpenAPITags, []string{"users"})
 	}
-	addAuth := func(b *restful.RouteBuilder) {
+	addBasicAuth := func(b *restful.RouteBuilder) {
+		b.Filter(u.auth.basicAuthenticate).
+			Returns(http.StatusUnauthorized, "Not Authorized", nil)
+	}
+	addJWTAuth := func(b *restful.RouteBuilder) {
 		b.Filter(u.auth.JWTAuthenticate).
 			Param(u.auth.hpAuthorization).
 			Returns(http.StatusUnauthorized, "Not Authorized", "")
@@ -134,16 +138,14 @@ func (u UserResource) WebService() *restful.WebService {
 
 	ws.Route(ws.GET("/").Doc("get all users").
 		To(u.findAllUsers).
-		Filter(u.auth.basicAuthenticate).
-		Returns(http.StatusUnauthorized, "Not Authorized", nil).
 		Returns(http.StatusOK, "OK", []User{}).
-		Do(tagUsers))
+		Do(tagUsers, addBasicAuth))
 
 	ws.Route(ws.PUT("").Doc("create a user").
 		To(u.createUser).
 		Reads(User{}).
 		Returns(http.StatusCreated, "Created", User{}).
-		Do(tagUsers, addAuth))
+		Do(tagUsers, addJWTAuth))
 
 	ws.Route(ws.GET("/{%s}", u.ppUID).Doc("get a user").
 		To(u.findUser).
@@ -156,13 +158,13 @@ func (u UserResource) WebService() *restful.WebService {
 		Reads(User{}).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Do(tagUsers, addAuth))
+		Do(tagUsers, addJWTAuth))
 
 	ws.Route(ws.DELETE("/{%s}", u.ppUID).Doc("delete a user").
 		To(u.removeUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusNoContent, "No Content", nil).
-		Do(tagUsers, addAuth))
+		Do(tagUsers, addJWTAuth))
 
 	return ws
 }
