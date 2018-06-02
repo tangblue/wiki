@@ -22,13 +22,24 @@ type JWTToken struct {
 }
 
 type Auth struct {
-	secret          string
+	secret string
+
 	hpAuthorization *restful.Parameter
 }
 
-func (a *Auth) WebService() *restful.WebService {
+func NewAuth(secret string) *Auth {
+	return &Auth{
+		secret: secret,
+		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header").
+			Required(true).
+			LengthRange(8, 128).
+			DefaultValue("Bearer "),
+	}
+}
+
+func (a *Auth) WebService(path string, tags []string) *restful.WebService {
 	ws := new(restful.WebService)
-	ws.Path("/login").
+	ws.Path(path).
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
@@ -38,7 +49,7 @@ func (a *Auth) WebService() *restful.WebService {
 		Returns(http.StatusOK, "OK", JWTToken{}).
 		Returns(http.StatusInternalServerError, "Internal Server Error", nil).
 		Returns(http.StatusUnprocessableEntity, "Bad user name or password", nil).
-		Metadata(restfulspec.KeyOpenAPITags, []string{"authentication"}))
+		Metadata(restfulspec.KeyOpenAPITags, tags))
 
 	return ws
 }
@@ -105,20 +116,32 @@ type User struct {
 }
 
 type UserResource struct {
+	auth *Auth
+
+	ppUID *restful.Parameter
 	// normally one would use DAO (data access object)
 	users map[UID]User
-	ppUID *restful.Parameter
-
-	auth *Auth
 }
 
-func (u UserResource) WebService() *restful.WebService {
+func NewUserResource(auth *Auth) *UserResource {
+	return &UserResource{
+		auth: auth,
+
+		ppUID: restful.PathParameter("userID", "identifier of the user").
+			DataType(UID(0)).
+			Regex("\\d+").
+			ValueRange(UID(0), UID(10)),
+		users: map[UID]User{},
+	}
+}
+
+func (u *UserResource) WebService(path string, tags []string) *restful.WebService {
 	printPath := func(req *restful.Request, resp *restful.Response, next func(*restful.Request, *restful.Response)) {
 		log.Printf("Path: %v", req.Request.URL.Path)
 		next(req, resp)
 	}
 	tagUsers := func(b *restful.RouteBuilder) {
-		b.Metadata(restfulspec.KeyOpenAPITags, []string{"users"})
+		b.Metadata(restfulspec.KeyOpenAPITags, tags)
 	}
 	basicAuth := func(b *restful.RouteBuilder) {
 		b.Filter(u.auth.basicAuthenticate).
@@ -131,7 +154,7 @@ func (u UserResource) WebService() *restful.WebService {
 	}
 
 	ws := new(restful.WebService)
-	ws.Path("/users").
+	ws.Path(path).
 		Consumes(restful.MIME_JSON, restful.MIME_XML).
 		Produces(restful.MIME_JSON, restful.MIME_XML).
 		Filter(printPath)
@@ -169,7 +192,7 @@ func (u UserResource) WebService() *restful.WebService {
 	return ws
 }
 
-func (u UserResource) findAllUsers(req *restful.Request, resp *restful.Response) {
+func (u *UserResource) findAllUsers(req *restful.Request, resp *restful.Response) {
 	list := []User{}
 	for _, each := range u.users {
 		list = append(list, each)
@@ -177,12 +200,12 @@ func (u UserResource) findAllUsers(req *restful.Request, resp *restful.Response)
 	resp.WriteEntity(list)
 }
 
-func (u UserResource) getUID(req *restful.Request) (UID, error) {
+func (u *UserResource) getUID(req *restful.Request) (UID, error) {
 	param, err := req.GetParameter(u.ppUID)
 	return param.(UID), err
 }
 
-func (u UserResource) findUser(req *restful.Request, resp *restful.Response) {
+func (u *UserResource) findUser(req *restful.Request, resp *restful.Response) {
 	id, err := u.getUID(req)
 	if err != nil {
 		resp.WriteErrorString(http.StatusBadRequest, "User ID is invalid.")
@@ -240,18 +263,11 @@ func (u *UserResource) removeUser(req *restful.Request, resp *restful.Response) 
 }
 
 func main() {
-	auth := &Auth{
-		secret:          "secret",
-		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header").Required(true).LengthRange(8, 128).DefaultValue("Bearer "),
-	}
-	restful.DefaultContainer.Add(auth.WebService())
+	auth := NewAuth("secret")
+	restful.DefaultContainer.Add(auth.WebService("/login", []string{"authentication"}))
 
-	u := UserResource{
-		users: map[UID]User{},
-		ppUID: restful.PathParameter("userID", "identifier of the user").DataType(UID(0)).Regex("\\d+").ValueRange(UID(0), UID(10)),
-		auth:  auth,
-	}
-	restful.DefaultContainer.Add(u.WebService())
+	u := NewUserResource(auth)
+	restful.DefaultContainer.Add(u.WebService("/users", []string{"users"}))
 
 	swaggerJson := "/apidocs.json"
 	config := restfulspec.Config{
