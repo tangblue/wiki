@@ -33,7 +33,7 @@ func (a *Auth) WebService() *restful.WebService {
 		Produces(restful.MIME_JSON)
 
 	ws.Route(ws.POST("").Doc("login").
-		Do(a.createToken).
+		Handler(a.createToken).
 		Reads(LoginInfo{}).
 		Returns(http.StatusOK, "OK", JWTToken{}).
 		Returns(http.StatusInternalServerError, "Internal Server Error", nil).
@@ -137,34 +137,34 @@ func (u UserResource) WebService() *restful.WebService {
 		Filter(printPath)
 
 	ws.Route(ws.GET("/").Doc("get all users").
-		Do(u.findAllUsers).
+		Handler(u.findAllUsers).
 		Returns(http.StatusOK, "OK", []User{}).
-		Add(tagUsers, basicAuth))
+		Do(tagUsers, basicAuth))
 
 	ws.Route(ws.PUT("").Doc("create a user").
-		Do(u.createUser).
+		Handler(u.createUser).
 		Reads(User{}).
 		Returns(http.StatusCreated, "Created", User{}).
-		Add(tagUsers, JWTAuth))
+		Do(tagUsers, JWTAuth))
 
 	ws.Route(ws.GET("/{%s}", u.ppUID).Doc("get a user").
-		Do(u.findUser).
+		Handler(u.findUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Add(tagUsers))
+		Do(tagUsers))
 
 	ws.Route(ws.PUT("/{%s}", u.ppUID).Doc("update a user").
-		Do(u.updateUser).
+		Handler(u.updateUser).
 		Reads(User{}).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusOK, "OK", User{}).
-		Add(tagUsers, JWTAuth))
+		Do(tagUsers, JWTAuth))
 
 	ws.Route(ws.DELETE("/{%s}", u.ppUID).Doc("delete a user").
-		Do(u.removeUser).
+		Handler(u.removeUser).
 		Returns(http.StatusNotFound, "Not Found", nil).
 		Returns(http.StatusNoContent, "No Content", nil).
-		Add(tagUsers, JWTAuth))
+		Do(tagUsers, JWTAuth))
 
 	return ws
 }
@@ -242,7 +242,7 @@ func (u *UserResource) removeUser(req *restful.Request, resp *restful.Response) 
 func main() {
 	auth := &Auth{
 		secret:          "secret",
-		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header").Required(true).LengthRange(8, 128),
+		hpAuthorization: restful.HeaderParameter("authorization", "JWT in authorization header").Required(true).LengthRange(8, 128).DefaultValue("Bearer "),
 	}
 	restful.DefaultContainer.Add(auth.WebService())
 
