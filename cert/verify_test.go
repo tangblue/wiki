@@ -2,43 +2,40 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package x509
+package certtest
 
 import (
+	"bufio"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
-	"runtime"
-	"strings"
-	"testing"
-	"time"
 	"io/ioutil"
 	"log"
 	"os"
-	"crypto/rand"
-	"bufio"
-	"crypto"
-	"crypto/rsa"
-	"encoding/base64"
+	"strings"
+	"testing"
+	"time"
 
+	"github.com/google/certificate-transparency-go/x509"
 	"github.com/google/certificate-transparency-go/x509/pkix"
 )
 
 var supportSHA2 = true
 
 type verifyTest struct {
-	leaf                           string
-	leafKey                        string
-	intermediates                  []string
-	roots                          []string
-	currentTime                    int64
-	dnsName                        string
-	systemSkip                     bool
-	keyUsages                      []ExtKeyUsage
-	testSystemRootsError           bool
-	sha2                           bool
-	disableTimeChecks              bool
-	disableCriticalExtensionChecks bool
-	disableNameChecks              bool
+	leaf              string
+	leafKey           string
+	intermediates     []string
+	roots             []string
+	currentTime       int64
+	dnsName           string
+	systemSkip        bool
+	keyUsages         []x509.ExtKeyUsage
+	sha2              bool
+	disableTimeChecks bool
 
 	errorCallback  func(*testing.T, int, error) bool
 	expectedChains [][]string
@@ -46,11 +43,11 @@ type verifyTest struct {
 
 var verifyTests = []verifyTest{
 	{
-		leaf:          "/home/tang/cert/chain/ExampleServer.crt",
-		leafKey:       "/home/tang/cert/chain/ExampleServer.key",
-		intermediates: []string{"/home/tang/cert/chain/ExampleIntermediateCA.crt"},
-		roots:         []string{"/home/tang/cert/chain/ExampleRootCA.crt"},
-		currentTime:   1536739579,
+		leaf:          "ExampleServer.crt",
+		leafKey:       "ExampleServer.key",
+		intermediates: []string{"ExampleIntermediateCA.crt"},
+		roots:         []string{"ExampleRootCA.crt"},
+		currentTime:   0,
 		dnsName:       "*.example.com",
 
 		expectedChains: [][]string{
@@ -72,13 +69,13 @@ func readPEM(pemName string) []byte {
 	return pemBytes
 }
 
-func certificateFromPEM(pemName string) (*Certificate, error) {
+func certificateFromPEM(pemName string) (*x509.Certificate, error) {
 	pemBytes := readPEM(pemName)
 	block, _ := pem.Decode([]byte(pemBytes))
 	if block == nil {
 		return nil, errors.New("failed to decode PEM")
 	}
-	return ParseCertificate(block.Bytes)
+	return x509.ParseCertificate(block.Bytes)
 }
 
 func testVerify(t *testing.T, useSystemRoots bool) {
@@ -86,25 +83,24 @@ func testVerify(t *testing.T, useSystemRoots bool) {
 		if useSystemRoots && test.systemSkip {
 			continue
 		}
-		if runtime.GOOS == "windows" && test.testSystemRootsError {
-			continue
-		}
 		if useSystemRoots && !supportSHA2 && test.sha2 {
 			continue
 		}
 
-		opts := VerifyOptions{
-			Intermediates:                  NewCertPool(),
-			DNSName:                        test.dnsName,
-			CurrentTime:                    time.Unix(test.currentTime, 0),
-			KeyUsages:                      test.keyUsages,
-			DisableTimeChecks:              test.disableTimeChecks,
-			DisableCriticalExtensionChecks: test.disableCriticalExtensionChecks,
-			DisableNameChecks:              test.disableNameChecks,
+		currentTime := test.currentTime
+		if currentTime == 0 {
+			currentTime = time.Now().Unix()
+		}
+		opts := x509.VerifyOptions{
+			Intermediates:     x509.NewCertPool(),
+			DNSName:           test.dnsName,
+			CurrentTime:       time.Unix(currentTime, 0),
+			KeyUsages:         test.keyUsages,
+			DisableTimeChecks: test.disableTimeChecks,
 		}
 
 		if !useSystemRoots {
-			opts.Roots = NewCertPool()
+			opts.Roots = x509.NewCertPool()
 			for j, root := range test.roots {
 				ok := opts.Roots.AppendCertsFromPEM(readPEM(root))
 				if !ok {
@@ -123,23 +119,12 @@ func testVerify(t *testing.T, useSystemRoots bool) {
 		}
 
 		leaf, err := certificateFromPEM(test.leaf)
-		if IsFatal(err) {
+		if err != nil {
 			t.Errorf("#%d: failed to parse leaf: %s", i, err)
 			return
 		}
 
-		var oldSystemRoots *CertPool
-		if test.testSystemRootsError {
-			oldSystemRoots = systemRootsPool()
-			systemRoots = nil
-			opts.Roots = nil
-		}
-
 		chains, err := leaf.Verify(opts)
-
-		if test.testSystemRootsError {
-			systemRoots = oldSystemRoots
-		}
 
 		if test.errorCallback == nil && err != nil {
 			t.Errorf("#%d: unexpected error: %s", i, err)
@@ -197,75 +182,75 @@ func testVerify(t *testing.T, useSystemRoots bool) {
 	}
 }
 
-func verifySignature(cert *Certificate, message string, signature string) error {
-    signDataByte, err := base64.StdEncoding.DecodeString(signature)
-    if err != nil {
-        return err
-    }
+func verifySignature(cert *x509.Certificate, message string, signature string) error {
+	signDataByte, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		return err
+	}
 
-    h := crypto.Hash.New(crypto.SHA256)
-    h.Write([]byte(message))
-    hashed := h.Sum(nil)
+	h := crypto.Hash.New(crypto.SHA256)
+	h.Write([]byte(message))
+	hashed := h.Sum(nil)
 
-    err = rsa.VerifyPKCS1v15(cert.PublicKey.(*rsa.PublicKey), crypto.SHA256, hashed, signDataByte)
-    if err != nil {
-        return err
-    }
+	err = rsa.VerifyPKCS1v15(cert.PublicKey.(*rsa.PublicKey), crypto.SHA256, hashed, signDataByte)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 func readPrivateKey(filepath string) (string, error) {
-    s := ""
-    fp, err := os.Open(filepath)
-    if err != nil {
-        return "", err
-    }
-    defer fp.Close()
-    scanner := bufio.NewScanner(fp)
-    for scanner.Scan() {
-        text := scanner.Text()
-        if text == "-----BEGIN RSA PRIVATE KEY-----" || text == "-----END RSA PRIVATE KEY-----" {
-            continue
-        }
-        s = s + scanner.Text()
-    }
-    if err := scanner.Err(); err != nil {
-        return "", err
-    }
+	s := ""
+	fp, err := os.Open(filepath)
+	if err != nil {
+		return "", err
+	}
+	defer fp.Close()
+	scanner := bufio.NewScanner(fp)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text == "-----BEGIN RSA PRIVATE KEY-----" || text == "-----END RSA PRIVATE KEY-----" {
+			continue
+		}
+		s = s + scanner.Text()
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
 
-    return s, nil
+	return s, nil
 }
 
 func createSignature(message, keystr string) (string, error) {
-    keyBytes, err := base64.StdEncoding.DecodeString(keystr)
-    if err != nil {
-        return "", err
-    }
+	keyBytes, err := base64.StdEncoding.DecodeString(keystr)
+	if err != nil {
+		return "", err
+	}
 
-    private, err := ParsePKCS1PrivateKey(keyBytes)
-    if err != nil {
-        return "", err
-    }
+	private, err := x509.ParsePKCS1PrivateKey(keyBytes)
+	if err != nil {
+		return "", err
+	}
 
-    h := crypto.Hash.New(crypto.SHA256)
-    h.Write(([]byte)(message))
-    hashed := h.Sum(nil)
+	h := crypto.Hash.New(crypto.SHA256)
+	h.Write(([]byte)(message))
+	hashed := h.Sum(nil)
 
-    signedData, err := rsa.SignPKCS1v15(rand.Reader, private, crypto.SHA256, hashed)
-    if err != nil {
-        return "", err
-    }
+	signedData, err := rsa.SignPKCS1v15(rand.Reader, private, crypto.SHA256, hashed)
+	if err != nil {
+		return "", err
+	}
 
-    signature := base64.StdEncoding.EncodeToString(signedData)
-    return signature, nil
+	signature := base64.StdEncoding.EncodeToString(signedData)
+	return signature, nil
 }
 
 func TestGoVerify(t *testing.T) {
 	testVerify(t, false)
 }
 
-func chainToDebugString(chain []*Certificate) string {
+func chainToDebugString(chain []*x509.Certificate) string {
 	var chainStr string
 	for _, cert := range chain {
 		if len(chainStr) > 0 {
