@@ -22,7 +22,7 @@ diff -u0 /etc/screenrc ~/.screenrc
 ## GO
 ### Install
 ```
-curl https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz | tar -C ~/opt/ xzf -
+(VER=1.11.1; curl https://dl.google.com/go/go${VER}.linux-amd64.tar.gz | tar xz -C ~/opt/)
 ```
 ### ${GOPATH}/bin/gotmp
 ```
