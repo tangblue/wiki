@@ -1,9 +1,9 @@
 ## bash
 * Run multiple commands as another user with single quote escape
 ```
-sudo -i -u another bash -c '
-echo '\''$HOME'\'' &&
-echo '\''$HOME'\''
+sudo -i -u <user> bash -c '
+echo '\''$HOME'\'';
+echo '\''$HOME'\'';
 '
 ```
 
