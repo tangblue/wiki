@@ -1,10 +1,10 @@
 ## bash
-* Run multiple commands as another user with single quote escape
+* Run multiple commands as another user
 ```
-sudo -i -u <user> bash -c '
-echo '\''$HOME'\'';
-echo '\''$HOME'\'';
-'
+cat << 'EOF' | sudo -i -u <user> bash
+echo '$HOME'
+echo "$HOME"
+EOF
 ```
 
 * Append multiple lines to script
