@@ -22,14 +22,18 @@ diff -u0 /etc/screenrc ~/.screenrc
 ## GO
 ### Install
 ```
-(VER=1.11.1; curl https://dl.google.com/go/go${VER}.linux-amd64.tar.gz | tar xz -C ~/opt/)
+(VER=1.11.4; [ -d ~/opt ] || mkdir ~/opt; curl https://dl.google.com/go/go${VER}.linux-amd64.tar.gz | tar xz -C ~/opt/)
+export PATH="$HOME/opt/go/bin:$PATH"
+git clone https://github.com/fatih/vim-go.git ~/.vim/pack/plugins/start/vim-go
 ```
-### ${GOPATH}/bin/gotmp
+### ${HOME}/bin/gotmp
 ```
+cat << 'EOF' > ~/bin/gotmp
 export GOPATH=${HOME}/tmp/go
 
-export PATH=${PATH}:${GOPATH}/bin
+export PATH="${GOPATH}/bin:${PATH}"
 export PS1='${debian_chroot:+($debian_chroot)}\u@gotmp:\w\$ '
 cd ${GOPATH}/src
+EOF
 ```
 
