@@ -1,7 +1,7 @@
 ## bash
 * Run multiple commands as another user
 ```
-cat << 'EOF' | sudo -i -u <user> bash
+cat << 'EOF' | sudo -i -u $(whoami) bash
 echo '$HOME'
 echo "$HOME"
 EOF
