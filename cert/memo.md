@@ -1,5 +1,5 @@
 openssl genrsa -out ExampleRootCA.key 4096
-openssl req -new -x509 -days 365 -subj "/C=US/ST=State/O=organization/CN=Example Root CA" -extensions v3_ca -key ExampleRootCA.key -out ExampleRootCA.crt
+openssl req -new -x509 -days 3650 -subj "/C=US/ST=State/O=organization/CN=Example Root CA" -extensions v3_ca -key ExampleRootCA.key -out ExampleRootCA.crt
 openssl x509 -noout -text -in ExampleRootCA.crt
 openssl x509 -inform PEM -outform DER -in ExampleRootCA.crt -out ExampleRootCA.der.crt
 openssl x509 -inform DER -noout -text -in ExampleRootCA.der.crt
