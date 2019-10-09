@@ -22,7 +22,7 @@ diff -u0 /etc/screenrc ~/.screenrc
 ## GO
 ### Install
 ```
-(VER=1.11.4; [ -d ~/opt ] || mkdir ~/opt; curl https://dl.google.com/go/go${VER}.linux-amd64.tar.gz | tar xz -C ~/opt/)
+(VER=1.13.1; [ -d ~/opt ] || mkdir ~/opt; rm -rf ~/opt/go; curl https://dl.google.com/go/go${VER}.linux-amd64.tar.gz | tar xz -C ~/opt/)
 export PATH="$HOME/opt/go/bin:$HOME/go/bin:$PATH"
 git clone https://github.com/fatih/vim-go.git ~/.vim/pack/plugins/start/vim-go
 go get -u github.com/jstemmer/gotags
