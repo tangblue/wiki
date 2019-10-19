@@ -12,7 +12,7 @@ openssl x509 -noout -text -in ExampleIntermediateCA.crt
 openssl genrsa -out ExampleServer.key 2048
 openssl req -new -subj "/C=US/ST=State/O=organization/CN=example.com" -key ExampleServer.key -addext "subjectAltName = DNS:example.com,DNS:*.example.com" -out ExampleServer.csr
 openssl req -noout -text -in ExampleServer.csr
-openssl x509 -req -days 1000 -extfile <(cat v3.ext <(printf "subjectAltName=DNS:example.com,DNS:*.example.com")) -in ExampleServer.csr -CA ExampleIntermediateCA.crt -CAkey ExampleIntermediateCA.key -set_serial 0101 -out ExampleServer.crt -sha1
+openssl x509 -req -days 1000 -extfile <(cat v3.ext <(printf "subjectAltName=DNS:example.com,DNS:*.example.com")) -in ExampleServer.csr -CA ExampleIntermediateCA.crt -CAkey ExampleIntermediateCA.key -set_serial 0101 -out ExampleServer.crt -sha256
 openssl x509 -noout -text -in ExampleServer.crt
 cat ExampleServer.crt ExampleIntermediateCA.crt > ExampleServerMerged.crt
 openssl x509 -noout -text -in ExampleServerMerged.crt
@@ -21,7 +21,7 @@ go test -run Verify
 
 openssl genrsa -out ExampleClient.key 2048
 openssl req -new -subj "/C=US/ST=State/O=organization/CN=client1.example.com" -key ExampleClient.key -out ExampleClient.csr
-openssl x509 -req -days 1000 -extfile v3.ext -in ExampleClient.csr -CA ExampleIntermediateCA.crt -CAkey ExampleIntermediateCA.key -set_serial 0101 -out ExampleClient.crt -sha1
+openssl x509 -req -days 1000 -extfile v3.ext -in ExampleClient.csr -CA ExampleIntermediateCA.crt -CAkey ExampleIntermediateCA.key -set_serial 0101 -out ExampleClient.crt -sha256
 openssl x509 -noout -text -in ExampleClient.crt
 
 openssl pkcs8 -topk8 -in ExampleClient.key -inform pem -out ExampleClient.key.pkcs8.pem -outform pem -nocrypt
