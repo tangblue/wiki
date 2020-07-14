@@ -18,3 +18,21 @@ fi
 eval "$(pyenv virtualenv-init -)"
 EOF
 ```
+
+* env for command(Bash Command Substitution)
+```
+(export $(cat << EOF
+A=B
+B=C
+EOF
+); set)
+```
+
+* env file for docker(Bash Process Substitution)
+```
+docker run -it --rm --env-file <(cat << EOF
+A=B
+B=C
+EOF
+) bash
+```
