@@ -16,19 +16,19 @@ type Data struct {
 }
 
 func main() {
-	http.HandleFunc("/", plotHandle)
-	http.Handle("/data", websocket.Handler(dataHandler))
+	http.HandleFunc("/websocket", wsHandler)
+	http.Handle("/wsdata", websocket.Handler(wsDataHandler))
 	err := http.ListenAndServe(":8888", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func plotHandle(w http.ResponseWriter, r *http.Request) {
+func wsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, page)
 }
 
-func dataHandler(ws *websocket.Conn) {
+func wsDataHandler(ws *websocket.Conn) {
 	dataCh := make(chan Data, 1)
 	isRunning := true
 
@@ -65,7 +65,8 @@ const page = `
           p1.innerHTML = myData;
       };
       window.onload = function() {
-          sock = new WebSocket("ws://"+location.host+"/data");
+		  let protocal = location.protocol === "https:" ? "wss:" : "ws:";
+          sock = new WebSocket(protocal+"//"+location.host+"/wsdata");
           sock.onmessage = function(event) {
               var data = JSON.parse(event.data);
               myData = data.myData;
