@@ -36,3 +36,16 @@ B=C
 EOF
 ) bash
 ```
+
+## GCP
+Conect Cloud SQL with private IP from local develop environment.  [ref](https://medium.com/google-cloud/cloud-sql-with-private-ip-only-the-good-the-bad-and-the-ugly-de4ac23ce98a)
+```
+gcloud compute scp /local/path/to/cloud_sql_proxy <instanceName>:/tmp
+gcloud compute ssh <instance Name> --zone=<Your zone>
+gcloud compute start-iap-tunnel <instance Name> 22 \
+  --zone=<Your zone> --local-host-port=localhost:4226
+ssh -L 3306:localhost:3306 \
+  -i ~/.ssh/google_compute_engine \
+  -p 4226 localhost \
+  -- /tmp/cloud_sql_proxy instances=<connection_name>=tcp:3306
+```
