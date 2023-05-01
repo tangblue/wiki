@@ -49,3 +49,49 @@ ssh -L 3306:localhost:3306 \
   -p 4226 localhost \
   -- /tmp/cloud_sql_proxy instances=<connection_name>=tcp:3306
 ```
+
+
+## Docker
+
+### Dockerfile for python
+```
+FROM python:3.9-slim as builder
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc
+
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+RUN pip install --no-cache /wheels/*
+
+RUN addgroup --gid 1001 --system app && \
+    adduser --no-create-home --shell /bin/false --disabled-password --uid 1001 --system --group app
+
+USER app
+
+COPY src /app/src
+
+CMD ["python","./src/main.py"]
+```
+
+### Install python modules for lambda
+```
+docker run --rm --platform linux/amd64 \
+    -v $(pwd)/src/requirements.txt:/app/src/requirements.txt \
+    -v $(pwd)/build/lambda_layer:/work -w /work \
+    python:3.9 pip install -r /app/src/requirements.txt -t ./python
+```
