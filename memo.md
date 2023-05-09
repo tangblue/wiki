@@ -94,4 +94,5 @@ docker run --rm --platform linux/amd64 \
     -v $(pwd)/src/requirements.txt:/app/src/requirements.txt \
     -v $(pwd)/build/lambda_layer:/work -w /work \
     python:3.9 pip install -r /app/src/requirements.txt -t ./python
+pushd ./build/lambda_layer; zip -r ${OLDPWD}/build/python_libs.zip .; popd
 ```
