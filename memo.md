@@ -37,6 +37,18 @@ EOF
 ) bash
 ```
 
+* load variables from a file
+```
+$ cat env_db 
+db_host=xxxx
+db_port=443
+db_user=xxxx
+db_password=xxxx
+db_database=xxxx
+db_schema=xxxx
+$ . env_db; PGPASSWORD=${db_password} psql -h $db_host -p $db_port -U $db_user -d $db_database
+```
+
 ## GCP
 Conect Cloud SQL with private IP from local develop environment.  [ref](https://medium.com/google-cloud/cloud-sql-with-private-ip-only-the-good-the-bad-and-the-ugly-de4ac23ce98a)
 ```
