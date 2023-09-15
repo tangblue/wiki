@@ -48,6 +48,14 @@ db_database=xxxx
 db_schema=xxxx
 $ . env_db; PGPASSWORD=${db_password} psql -h $db_host -p $db_port -U $db_user -d $db_database
 ```
+* command chain
+```
+TYPE="user" DATE=$(date '+%Y%m%d'); \
+DOWNLOAD_URL=$(curl --silent -X POST -H "Content-Type: application/json" -H "X-AuthKey: xxxx" \
+    -d "{\"type\": \"${TYPE}\", \"date\": \"${DATE}\"}" \
+    https://www.xxx.com/download_url | jq --raw-output '.download_url'); \
+curl ${DOWNLOAD_URL} --silent -o tmp/${TYPE}.${DATE}.csv
+```
 
 ## GCP
 Conect Cloud SQL with private IP from local develop environment.  [ref](https://medium.com/google-cloud/cloud-sql-with-private-ip-only-the-good-the-bad-and-the-ugly-de4ac23ce98a)
